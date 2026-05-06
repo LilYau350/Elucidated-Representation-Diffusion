@@ -814,7 +814,23 @@ class GaussianDiffusion:
             raise NotImplementedError(f"Unknown time_dist: {self.args.time_dist}")
             
         return t
-    
+
+    def compute_target(self, x_start, noise, t, alpha=None, sigma=None):
+        if alpha is None or sigma is None:
+            alpha = _extract_into_tensor(self.sqrt_alphas_cumprod, t, t.shape)
+            sigma = _extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, t.shape)
+
+        target = {
+            ModelMeanType.PREVIOUS_X: self.q_posterior_mean_variance(
+                x_start=x_start, x_t=self.q_sample(x_start, t, noise=noise), t=t
+            )[0],
+            ModelMeanType.START_X: x_start,
+            ModelMeanType.EPSILON: noise,
+            ModelMeanType.VELOCITY: alpha[:, None, None, None] * noise - sigma[:, None, None, None] * x_start,
+        }[self.model_mean_type]
+        
+        return target
+        
     def training_losses(self, model, x_start, features=None, t=None, model_kwargs=None, noise=None):
         """
         Compute training losses for a single timestep.
@@ -888,15 +904,15 @@ class GaussianDiffusion:
                     # Divide by 1000 for equivalence with initial implementation.
                     # Without a factor of 1/1000, the VB term hurts the MSE term.
                     terms["vb"] *= self.num_timesteps / 1000.0
-
-            target = {
-                ModelMeanType.PREVIOUS_X: self.q_posterior_mean_variance(
-                    x_start=x_start, x_t=x_t, t=t
-                )[0],
-                ModelMeanType.START_X: x_start,
-                ModelMeanType.EPSILON: noise,
-                ModelMeanType.VELOCITY: alpha[:, None, None, None] * noise - sigma[:, None, None, None] * x_start,
-            }[self.model_mean_type]
+            target = self.compute_target(x_start, noise, t, alpha, sigma)
+            # target = {
+            #     ModelMeanType.PREVIOUS_X: self.q_posterior_mean_variance(
+            #         x_start=x_start, x_t=x_t, t=t
+            #     )[0],
+            #     ModelMeanType.START_X: x_start,
+            #     ModelMeanType.EPSILON: noise,
+            #     ModelMeanType.VELOCITY: alpha[:, None, None, None] * noise - sigma[:, None, None, None] * x_start,
+            # }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
 
             raw_mse = mean_flat((target - model_output) ** 2)
