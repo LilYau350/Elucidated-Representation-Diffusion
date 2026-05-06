@@ -63,14 +63,17 @@ class Net(torch.nn.Module):
             guidance_scale = model_kwargs.get('guidance_scale', 1.0)
             if callable(guidance_scale):
                 guidance_scale = guidance_scale(c_noise.flatten().repeat(x.shape[0]).int()[0])
-            if not float_equal(guidance_scale, 1.0):
-                half = x[: len(x) // 2]
-                combined = torch.cat([half, half], dim=0)
-            else:
-                combined = x
+            # if not float_equal(guidance_scale, 1.0):
+            #     half = x[: len(x) // 2]
+            #     combined = torch.cat([half, half], dim=0)
+            # else:
+            #     combined = x
 
-            raw_output = self.model((c_in * combined).to(dtype), c_noise.flatten().repeat(x.shape[0]).int(),
+            # raw_output = self.model((c_in * combined).to(dtype), c_noise.flatten().repeat(x.shape[0]).int(),
+            #                y=class_labels, **model_kwargs)
+            raw_output = self.model((c_in * x).to(dtype), c_noise.flatten().repeat(x.shape[0]).int(),
                            y=class_labels, **model_kwargs)
+            
             if isinstance(raw_output, tuple):
                 F_x = raw_output[0]
             else:
