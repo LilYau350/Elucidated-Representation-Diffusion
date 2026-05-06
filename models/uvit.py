@@ -255,21 +255,25 @@ class UViT(nn.Module):
 
 # 2 for image 32*32, 4 for image 64*64, 4 for image 128*128, 16 for image 256*256
 
-def UViT_S(image_size, patch_size, in_channels, num_classes, **kwargs):
-    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=512, depth=13, num_heads=8, mlp_ratio=4, num_classes=num_classes, **kwargs)
+def UViT_S(image_size, patch_size, in_channels, num_classes, class_dropout_prob, **kwargs):
+    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=512, depth=13, num_heads=8, mlp_ratio=4, 
+                num_classes=num_classes, class_dropout_prob=class_dropout_prob, **kwargs)
 
-def UViT_S_D(image_size, patch_size, in_channels, num_classes, **kwargs):
-    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=512, depth=17, num_heads=8, mlp_ratio=4, num_classes=num_classes, **kwargs)
+def UViT_S_D(image_size, patch_size, in_channels, num_classes, class_dropout_prob, **kwargs):
+    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=512, depth=17, num_heads=8, mlp_ratio=4, 
+                num_classes=num_classes, class_dropout_prob=class_dropout_prob, **kwargs)
 
-def UViT_M(image_size, patch_size, in_channels, num_classes, **kwargs):
-    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=768, depth=17, num_heads=12, mlp_ratio=4, num_classes=num_classes, **kwargs)
+def UViT_M(image_size, patch_size, in_channels, num_classes, class_dropout_prob, **kwargs):
+    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=768, depth=17, num_heads=12, mlp_ratio=4, 
+                num_classes=num_classes, class_dropout_prob=class_dropout_prob,   **kwargs)
 
-def UViT_L(image_size, patch_size, in_channels, num_classes, **kwargs):
-    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=1024, depth=21, num_heads=16, mlp_ratio=4, num_classes=num_classes, **kwargs)
+def UViT_L(image_size, patch_size, in_channels, num_classes, class_dropout_prob, **kwargs):
+    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=1024, depth=21, num_heads=16, mlp_ratio=4, 
+                num_classes=num_classes, class_dropout_prob=class_dropout_prob, **kwargs)
 
-def UViT_H(image_size, patch_size, in_channels, num_classes, **kwargs):
-    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=1152, depth=29, num_heads=16, mlp_ratio=4, num_classes=num_classes, **kwargs)
-
+def UViT_H(image_size, patch_size, in_channels, num_classes, class_dropout_prob, **kwargs):
+    return UViT(image_size=image_size, patch_size=patch_size, in_channels=in_channels, embed_dim=1152, depth=29, num_heads=16, mlp_ratio=4, 
+                num_classes=num_classes, class_dropout_prob=class_dropout_prob, **kwargs)
 
 UViT_models = {
     "UViT-S": UViT_S,
