@@ -218,7 +218,7 @@ class Sampler:
         For CFG-based samplers, remove the null-class half from both samples and labels.
         """
         if not float_equal(self.args.guidance_scale, 1.0) and self.args.solver != 'ddim':
-            samples, labels = self._strip_null_class(samples, labels)
+            samples, labels = self._strip_cfg_duplicate(samples, labels)
 
         if self.vae is not None:
             with torch.no_grad(), torch.cuda.amp.autocast():
@@ -229,10 +229,10 @@ class Sampler:
         samples = self._inverse_normalize(samples)
         return samples, labels
 
-    def _strip_null_class(self, sample, labels=None):
+    def _strip_cfg_duplicate(self, sample, labels=None):
         """
-        If CFG duplicates the batch into [cond | uncond],
-        keep only the conditional half for both samples and labels.
+        After CFG guidance, the batch becomes [guided | guided].
+        Keep only the first half to remove duplicated samples.
         """
         if not float_equal(self.args.guidance_scale, 1.0) and self.args.solver != 'ddim':
             sample, _ = sample.chunk(2, dim=0)
