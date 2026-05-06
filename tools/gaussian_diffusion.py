@@ -904,15 +904,8 @@ class GaussianDiffusion:
                     # Divide by 1000 for equivalence with initial implementation.
                     # Without a factor of 1/1000, the VB term hurts the MSE term.
                     terms["vb"] *= self.num_timesteps / 1000.0
+                    
             target = self.compute_target(x_start, noise, t, alpha, sigma)
-            # target = {
-            #     ModelMeanType.PREVIOUS_X: self.q_posterior_mean_variance(
-            #         x_start=x_start, x_t=x_t, t=t
-            #     )[0],
-            #     ModelMeanType.START_X: x_start,
-            #     ModelMeanType.EPSILON: noise,
-            #     ModelMeanType.VELOCITY: alpha[:, None, None, None] * noise - sigma[:, None, None, None] * x_start,
-            # }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
 
             raw_mse = mean_flat((target - model_output) ** 2)
