@@ -996,8 +996,8 @@ def ADM_64(num_classes=10, in_channels=3, dropout=0, learn_sigma=False, class_co
                              drop_label_prob=drop_label_prob, learn_sigma=learn_sigma, class_cond=class_cond, **kwargs)
 
 def ADM_128(num_classes=10, in_channels=3, dropout=0, learn_sigma=False, class_cond=True, drop_label_prob=0.0, **kwargs):
-    return create_unet_model(image_size=128, num_channels=256, num_res_blocks=2, attention_resolutions="32,16,8",  num_heads=4, 
-                             num_head_channels=-1, num_classes=num_classes, dropout=dropout, in_channels=in_channels, 
+    return create_unet_model(image_size=128, num_channels=256, num_res_blocks=2, attention_resolutions="32,16,8", num_heads=1, 
+                             num_head_channels=64, num_classes=num_classes, dropout=dropout, in_channels=in_channels, 
                              drop_label_prob=drop_label_prob, learn_sigma=learn_sigma, class_cond=class_cond, **kwargs)
 
 def ADM_256(num_classes=10, in_channels=3, dropout=0, learn_sigma=False, class_cond=True, drop_label_prob=0.0, **kwargs):
@@ -1011,7 +1011,7 @@ def ADM_512(num_classes=10, in_channels=3, dropout=0, learn_sigma=False, class_c
                              drop_label_prob=drop_label_prob, learn_sigma=learn_sigma, class_cond=class_cond, **kwargs)
     
 def UNet_64(num_classes=10, in_channels=3, dropout=0, learn_sigma=False, class_cond=True, drop_label_prob=0.0, **kwargs):
-    return create_unet_model(image_size=64, num_channels=128, num_res_blocks=3, attention_resolutions="32,16,8", num_heads=1, 
+    return create_unet_model(image_size=64, num_channels=192, num_res_blocks=3, attention_resolutions="16,8", num_heads=4, 
                              channel_mult="1,2,2,2", num_head_channels=-1, num_classes=num_classes, dropout=dropout, in_channels=in_channels, 
                             drop_label_prob=drop_label_prob, learn_sigma=learn_sigma, class_cond=class_cond, **kwargs)
     
