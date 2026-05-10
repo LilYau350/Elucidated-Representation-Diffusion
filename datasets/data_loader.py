@@ -76,7 +76,8 @@ class Latent(Dataset):
         with h5py.File(self.h5_file, 'r') as f:
             latent = f[f'{self.dataset_type}_latents'][idx]
             label = f[f'{self.dataset_type}_labels'][idx]
-        latent = torch.tensor(latent.copy(), dtype=torch.long)
+        latent = torch.tensor(latent.copy(), dtype=torch.float32)
+        label = torch.tensor(label.copy(), dtype=torch.long)
         return latent, label
 
 
