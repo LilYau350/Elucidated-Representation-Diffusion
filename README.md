@@ -39,7 +39,7 @@ We refer to the methods described in [this paper](https://arxiv.org/abs/1707.088
 ##### ImageNet-256
 For ImageNet-256, we crop images to 256x256 and compress them using AutoencoderKL from [Diffusers](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/autoencoder_kl.py). We provide a preprocessing script at [encode.py](./preprocessing/encode.py). 
 ``` bash
-python ./preprocessing/encode_latent.py --input /path/to/imagenet --output /path/to/output --batch_size 32 --image_size 256 
+python ./preprocessing/encode_latent.py --input /path/to/imagenet --output /path/to/output --batch_size 32 --image_size 256 --vae 'ema'
 ```
 During compression, we use a scale factor of 0.18215 to stabilize diffusion model training, and similarly, divide by 0.18215 during decompression. This follows practices from [LDM](https://github.com/CompVis/latent-diffusion) and [DiT](https://github.com/huggingface/diffusers/issues/437#issuecomment-1356945792).
 
