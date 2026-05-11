@@ -148,7 +148,7 @@ if __name__ == "__main__":
     parser.add_argument("--vae", type=str, choices=["ema", "mse"], default="ema")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size for processing images")
     parser.add_argument("--image_size", type=int, default=256, help="Image size for processing")
-    parser.add_argument("--save_pixels", type=bool, default=True, help="Also save downsampled pixels into HDF5.")
+    parser.add_argument("--save_pixels", type=bool, default=False, help="Also save downsampled pixels into HDF5.")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
