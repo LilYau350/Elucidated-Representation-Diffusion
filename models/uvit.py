@@ -14,7 +14,7 @@ else:
         ATTENTION_MODE = 'xformers'
     except:
         ATTENTION_MODE = 'math'
-        
+# ATTENTION_MODE = 'math'     
 print(f'attention mode is {ATTENTION_MODE}')
 
 
