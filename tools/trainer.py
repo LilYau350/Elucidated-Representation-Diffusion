@@ -6,6 +6,7 @@ import os
 import torch.distributed as dist
 from tools.align_utils import initialize_encoders, get_feature
 from collections import OrderedDict
+from contextlib import nullcontext
 
 def ema(source, target, decay):
     with torch.no_grad():
@@ -87,15 +88,19 @@ class Trainer:
             if self.args.in_chans == 4:
                 images = sample_from_latent(images, self.args.latent_scale)  
             
-            if self.args.amp:
-                with autocast():
+            is_accumulating = (accumulation_step + 1) % grad_accumulation != 0
+            ctx = self.model.no_sync() if (self.args.parallel and is_accumulating) else nullcontext()
+            
+            with ctx:
+                if self.args.amp:
+                    with autocast():
+                        loss_dict = self._compute_loss(images, labels, features)
+                        loss = loss_dict["loss"].mean() / grad_accumulation
+                    self.scaler.scale(loss).backward()
+                else:
                     loss_dict = self._compute_loss(images, labels, features)
                     loss = loss_dict["loss"].mean() / grad_accumulation
-                self.scaler.scale(loss).backward()
-            else:
-                loss_dict = self._compute_loss(images, labels, features)
-                loss = loss_dict["loss"].mean() / grad_accumulation
-                loss.backward()
+                    loss.backward()
 
             total_loss_avg += loss.item()
 
@@ -127,7 +132,7 @@ class Trainer:
             if self.args.learn_align:
                 display_stats = OrderedDict([
                     ("align", f"{align_avg:.2f}"),
-                    ("mse", f"{mse_avg:.2}")                                   
+                    ("mse", f"{mse_avg:.2}")                                                   
                 ])
                 self.pbar.set_postfix(display_stats)
             else:
