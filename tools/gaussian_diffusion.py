@@ -1340,97 +1340,80 @@ class FlowMatching:
         return terms
     
     
-    #sampling
-    def forward_with_cfg(self, model, x, t_in, guidance_scale, **model_kwargs):
-        t = t_in.view(x.shape[0]) # make sure the shape fo t inputs mdoel is [batch_dim]
+    # sampling
+    def forward_model(self, model, sample_tensor, time_tensor, **model_kwargs):
+        time_tensor = time_tensor.view(sample_tensor.shape[0])
+
         with torch.cuda.amp.autocast(enabled=self.args.amp):
-            raw_output= model(x, t, **model_kwargs)
-            if isinstance(raw_output, tuple):
-                model_output = raw_output[0]
-            else:
-                model_output = raw_output
-            guidance_scale = guidance_scale(t_in.mean().item()) if callable(guidance_scale) else guidance_scale
-            if not self.float_equal(guidance_scale, 1.0):
-                cond, uncond = th.split(model_output, len(model_output) // 2, dim=0)
-                cond = uncond + guidance_scale * (cond - uncond)
-                model_output = th.cat([cond, cond], dim=0)
+            raw_output = model(sample_tensor, time_tensor, **model_kwargs)
+            model_output = raw_output[0] if isinstance(raw_output, tuple) else raw_output
+
         return model_output
 
-    def ode_sample(self, model, noise, device, num_steps=50, solver='dopri5', guidance_scale=1.0, **model_kwargs):
-        timesteps = th.linspace(1.0, 0.0, num_steps, device=device)
-        
-        def guided_drift(t, x):
-            t_in = self.expand_t_like_x(t, x)
-            model_output = self.forward_with_cfg(model, x, t_in, guidance_scale, **model_kwargs)
-            return self.convert_model_output_to_vector(model_output, x, t_in)
-        
-        samples = odeint(
-            func=guided_drift,
-            y0=noise,
-            t=timesteps,
-            method=solver,
-            rtol=self.rtol,
-            atol=self.atol,
-        )
-        return samples[-1]
-    
-    def compute_diffusion(self, t_cur):
-        return 2 * self.interpolant(t_cur)[1] * self.interpolant(t_cur)[3]
-    
-    def sde_sample(self, model, noise, device, num_steps=50, solver='heun', guidance_scale=1.0, **model_kwargs):
-        """
-        SDE sampler with Euler or Heun method and final deterministic step.
-        x_t is the initial latent (x_T), denoised to x_0.
-        """
-        def compute_drift(x, t_tensor, diffusion):
-            out = self.forward_with_cfg(model, x, t_tensor, guidance_scale, **model_kwargs)
-            s = self.convert_model_output_to_score(out, x, t_tensor)
-            v = self.convert_model_output_to_vector(out, x, t_tensor)
-            return v - 0.5 * diffusion * s
 
-        t_steps = th.linspace(1.0, 0.04, num_steps, dtype=th.float64, device=device)
-        t_steps = th.cat([t_steps, th.tensor([0.0], dtype=th.float64, device=device)])
-        x_t = noise
+    def ode_sample(self, model, noise, device, num_steps=50, solver='dopri5', **model_kwargs):
+        timesteps = th.linspace(1.0, 0.0, num_steps, device=device)
+
+        def drift(time_scalar, sample_tensor):
+            time_tensor = self.expand_t_like_x(time_scalar, sample_tensor)
+            model_output = self.forward_model(model, sample_tensor, time_tensor, **model_kwargs)
+            return self.convert_model_output_to_vector(model_output, sample_tensor, time_tensor)
+
+        samples = odeint(func=drift, y0=noise, t=timesteps, method=solver, rtol=self.rtol, atol=self.atol)
+        return samples[-1]
+
+
+    def compute_diffusion(self, time_tensor):
+        _, sigma_t, _, d_sigma_t = self.interpolant(time_tensor)
+        return 2 * sigma_t * d_sigma_t
+
+
+    def sde_sample(self, model, noise, device, num_steps=50, solver='heun', **model_kwargs):
+        def compute_drift(sample_tensor, time_tensor, diffusion):
+            model_output = self.forward_model(model, sample_tensor, time_tensor, **model_kwargs)
+            score = self.convert_model_output_to_score(model_output, sample_tensor, time_tensor)
+            vector = self.convert_model_output_to_vector(model_output, sample_tensor, time_tensor)
+            return vector - 0.5 * diffusion * score
+
+        timesteps = th.linspace(1.0, 0.04, num_steps, dtype=th.float64, device=device)
+        timesteps = th.cat([timesteps, th.tensor([0.0], dtype=th.float64, device=device)])
+        sample_tensor = noise
 
         with th.no_grad():
-            for t_cur, t_next in zip(t_steps[:-2], t_steps[1:-1]):
-                dt = t_next - t_cur
-                t_tensor = self.expand_t_like_x(t_cur, x_t)
-                diffusion = self.compute_diffusion(t_tensor)
-
-                d_cur = compute_drift(x_t, t_tensor, diffusion)
-
-                eps = th.randn_like(x_t)
-                noise_term = th.sqrt(diffusion) * eps * th.sqrt(th.abs(dt))
+            for time_cur, time_next in zip(timesteps[:-2], timesteps[1:-1]):
+                step_size = time_next - time_cur
+                time_tensor = self.expand_t_like_x(time_cur, sample_tensor)
+                diffusion = self.compute_diffusion(time_tensor)
+                drift_cur = compute_drift(sample_tensor, time_tensor, diffusion)
+                noise_term = th.sqrt(diffusion) * th.randn_like(sample_tensor) * th.sqrt(th.abs(step_size))
 
                 if solver == 'euler':
-                    x_t = x_t + d_cur * dt + noise_term
+                    sample_tensor = sample_tensor + drift_cur * step_size + noise_term
 
                 elif solver == 'heun':
-                    x_pred = x_t + d_cur * dt + noise_term
-                    t_next_tensor = self.expand_t_like_x(t_next, x_pred)
-                    diffusion_next = self.compute_diffusion(t_next_tensor)
-                    d_next = compute_drift(x_pred, t_next_tensor, diffusion_next)
-                    x_t = x_t + 0.5 * (d_cur + d_next) * dt + noise_term
+                    sample_pred = sample_tensor + drift_cur * step_size + noise_term
+                    time_next_tensor = self.expand_t_like_x(time_next, sample_pred)
+                    diffusion_next = self.compute_diffusion(time_next_tensor)
+                    drift_next = compute_drift(sample_pred, time_next_tensor, diffusion_next)
+                    sample_tensor = sample_tensor + 0.5 * (drift_cur + drift_next) * step_size + noise_term
 
                 else:
                     raise ValueError(f"Unknown solver: {solver}")
 
-            # Final deterministic step
-            t_cur, t_next = t_steps[-2], t_steps[-1]
-            dt = t_next - t_cur
-            t_tensor = self.expand_t_like_x(t_cur, x_t)
-            diffusion = self.compute_diffusion(t_tensor)
+            time_cur, time_next = timesteps[-2], timesteps[-1]
+            step_size = time_next - time_cur
+            time_tensor = self.expand_t_like_x(time_cur, sample_tensor)
+            diffusion = self.compute_diffusion(time_tensor)
+            drift_cur = compute_drift(sample_tensor, time_tensor, diffusion)
 
-            d_cur = compute_drift(x_t, t_tensor, diffusion)
-            mean_x = x_t + d_cur * dt  # no noise
+        return sample_tensor + drift_cur * step_size
 
-        return mean_x
 
-    def sample(self, model, noise, device, num_steps=50, solver='heun', guidance_scale=1.0, **model_kwargs):
-        if self.sampler_type == "ode": 
-            return self.ode_sample(model, noise, device, num_steps, solver=solver, guidance_scale=guidance_scale, **model_kwargs)
-        elif self.sampler_type == "sde": 
-            return self.sde_sample(model, noise, device, num_steps, solver=solver, guidance_scale=guidance_scale, **model_kwargs)
-        else: 
-            raise NotImplementedError(f"Unsupported sampler_type: {self.sampler_type}")
+    def sample(self, model, noise, device, num_steps=50, solver='heun', **model_kwargs):
+        if self.sampler_type == "ode":
+            return self.ode_sample(model, noise, device, num_steps, solver=solver, **model_kwargs)
+
+        if self.sampler_type == "sde":
+            return self.sde_sample(model, noise, device, num_steps, solver=solver, **model_kwargs)
+
+        raise NotImplementedError(f"Unsupported sampler_type: {self.sampler_type}")

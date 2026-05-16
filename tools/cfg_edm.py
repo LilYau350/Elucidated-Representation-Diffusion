@@ -5,15 +5,11 @@ import torch
 from functools import partial
 import torch.nn.functional as F
 from torch.cuda.amp import autocast
-# from tools.gaussian_diffusion import betas_for_alpha_bar
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OP_DIR = os.path.join(BASE_DIR, 'op')
 sys.path.append(OP_DIR)
 
-
-def float_equal(num1, num2, eps=1e-8):
-    return abs(num1 - num2) < eps
 
 class Net(torch.nn.Module):
     def __init__(self,
@@ -59,58 +55,31 @@ class Net(torch.nn.Module):
         with autocast(enabled=self.amp and not force_fp32):
             c_noise = self.M - 1 - self.round_sigma(sigma, return_index=True).to(torch.float32)
             c_in = 1 / (sigma ** 2 + 1).sqrt()
-            
-            guidance_scale = model_kwargs.get('guidance_scale', 1.0)
-            if callable(guidance_scale):
-                guidance_scale = guidance_scale(c_noise.flatten().repeat(x.shape[0]).int()[0])
-            # if not float_equal(guidance_scale, 1.0):
-            #     half = x[: len(x) // 2]
-            #     combined = torch.cat([half, half], dim=0)
-            # else:
-            #     combined = x
 
-            # raw_output = self.model((c_in * combined).to(dtype), c_noise.flatten().repeat(x.shape[0]).int(),
-            #                y=class_labels, **model_kwargs)
-            raw_output = self.model((c_in * x).to(dtype), c_noise.flatten().repeat(x.shape[0]).int(),
-                           y=class_labels, **model_kwargs)
-            
-            if isinstance(raw_output, tuple):
-                F_x = raw_output[0]
-            else:
-                F_x = raw_output
-            
-            assert F_x.dtype == dtype
+            raw_output = self.model((c_in * x).to(dtype), c_noise.flatten().repeat(x.shape[0]).int(), y=class_labels, **model_kwargs)
+            model_output = raw_output[0] if isinstance(raw_output, tuple) else raw_output
+
+            assert model_output.dtype == dtype
 
             if self.pred_type == 'EPSILON':
-                F_x = self.apply_cfg(F_x, guidance_scale)      
                 c_skip = 1
                 c_out = -sigma
-                D_x = c_skip * x + c_out * F_x[:, :self.img_channels].to(torch.float32)
-                
+                denoised = c_skip * x + c_out * model_output[:, :self.img_channels].to(torch.float32)
+
             elif self.pred_type == 'START_X':
-                # D_x = F_x
-                # D_x = self.apply(D_x, guidance_scale)     
-                D_x = self.apply_cfg(F_x, guidance_scale)
-                        
+                denoised = model_output
+
             elif self.pred_type == 'VELOCITY':
-                F_x = self.apply_cfg(F_x, guidance_scale)         
-                # v = sqrt_alpha_bar * eps - sqrt_one_minus_alpha_bar * x_0
-                c_skip = c_in ** 2  # \bar{\alpha}_t ** 2
-                c_out = -sigma * c_in  # -\sqrt{1 - \bar{\alpha}_t}
-                D_x = c_skip * x + c_out * F_x[:, :self.img_channels].to(torch.float32)
-                
+                c_skip = c_in ** 2
+                c_out = -sigma * c_in
+                denoised = c_skip * x + c_out * model_output[:, :self.img_channels].to(torch.float32)
+
             else:
                 raise ValueError(f"Unsupported pred_type: {self.pred_type}")
 
-        return D_x
-    
-    def apply_cfg(self, tensor, guidance_scale):
-        if not float_equal(guidance_scale, 1.0):
-            cond, uncond = torch.split(tensor, len(tensor) // 2, dim=0)
-            cond = uncond + guidance_scale * (cond - uncond)
-            tensor = torch.cat([cond, cond], dim=0)
-        return tensor
-    
+        return denoised
+        
+
     def alpha_bar(self, j):
         j = torch.as_tensor(j)
         if self.noise_schedule == 'cosine':
