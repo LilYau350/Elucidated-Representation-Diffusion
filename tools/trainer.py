@@ -8,6 +8,7 @@ from tools.align_utils import initialize_encoders, get_feature
 from collections import OrderedDict
 from contextlib import nullcontext
 
+
 def ema(source, target, decay):
     with torch.no_grad():
         source_dict = source.state_dict()
@@ -16,12 +17,14 @@ def ema(source, target, decay):
             target_dict[key].data.copy_(
                 target_dict[key].data * decay + source_dict[key].data * (1 - decay))
 
+
 def sample_from_latent(latent, latent_scale=1.):
     mean, std = torch.chunk(latent, 2, dim=1)
     latent_samples = mean + std * torch.randn_like(mean)
     latent_samples = latent_samples * latent_scale 
     return latent_samples 
     
+
 class Trainer:
     def __init__(self, args, device, model, ema_model, optimizer, scheduler, diffusion, train_loader, pbar=None):
         self.args = args
@@ -88,10 +91,16 @@ class Trainer:
             if self.args.in_chans == 4:
                 images = sample_from_latent(images, self.args.latent_scale)  
             
-            is_accumulating = (accumulation_step + 1) % grad_accumulation != 0
-            ctx = self.model.no_sync() if (self.args.parallel and is_accumulating) else nullcontext()
-            
-            with ctx:
+            if (
+                self.args.parallel
+                and grad_accumulation > 1
+                and accumulation_step < grad_accumulation - 1
+            ):
+                sync_context = self.model.no_sync()
+            else:
+                sync_context = nullcontext()
+
+            with sync_context:
                 if self.args.amp:
                     with autocast():
                         loss_dict = self._compute_loss(images, labels, features)
@@ -132,7 +141,7 @@ class Trainer:
             if self.args.learn_align:
                 display_stats = OrderedDict([
                     ("align", f"{align_avg:.2f}"),
-                    ("mse", f"{mse_avg:.2}")                                                   
+                    ("mse", f"{mse_avg:.2}")                                   
                 ])
                 self.pbar.set_postfix(display_stats)
             else:
