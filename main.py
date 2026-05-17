@@ -102,6 +102,7 @@ def parse_args():
     # DDP nad mixed precision training
     parser.add_argument("--parallel", default=False, type=str2bool, help="Use multi-GPU training")
     parser.add_argument('--amp', default=True, type=str2bool, help='Use AMP for mixed precision training')
+    parser.add_argument('--mixed_precision', type=str, default='bf16', choices=['no', 'fp16', 'bf16'], help='Choose mixed precision type (no, fp16, or bf16)')
     parser.add_argument('--grad_accumulation', type=int, default=1, help='Number of gradient accumulation steps (default: 1, no accumulation)')
     parser.add_argument('--resume', type=str, default=None, help='Path to the checkpoint to resume from')   
 
