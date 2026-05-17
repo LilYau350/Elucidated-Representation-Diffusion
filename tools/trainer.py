@@ -23,7 +23,7 @@ def sample_from_latent(latent, latent_scale=1.):
     latent_samples = mean + std * torch.randn_like(mean)
     latent_samples = latent_samples * latent_scale 
     return latent_samples 
-
+    
 
 class Trainer:
     def __init__(self, args, device, model, ema_model, optimizer, scheduler, diffusion, train_loader, pbar=None):
@@ -37,11 +37,8 @@ class Trainer:
         self.train_loader = train_loader
         self.datalooper = iter(train_loader)
         self.encoder = initialize_encoders(args, device) if args.learn_align else None            
+        self.scaler = GradScaler() if args.amp else None     
         self.pbar = pbar
-        
-        self.use_amp = (args.mixed_precision != 'no')
-        self.amp_dtype = torch.bfloat16 if args.mixed_precision == 'bf16' else torch.float16
-        self.scaler = GradScaler() if args.mixed_precision == 'fp16' else None
     
     def _get_next_batch(self):
         try:
@@ -104,13 +101,14 @@ class Trainer:
                 sync_context = nullcontext()
 
             with sync_context:
-                with autocast(dtype=self.amp_dtype, enabled=self.use_amp):
-                    loss_dict = self._compute_loss(images, labels, features)
-                    loss = loss_dict["loss"].mean() / grad_accumulation
-                
-                if self.scaler:
+                if self.args.amp:
+                    with autocast():
+                        loss_dict = self._compute_loss(images, labels, features)
+                        loss = loss_dict["loss"].mean() / grad_accumulation
                     self.scaler.scale(loss).backward()
                 else:
+                    loss_dict = self._compute_loss(images, labels, features)
+                    loss = loss_dict["loss"].mean() / grad_accumulation
                     loss.backward()
 
             total_loss_avg += loss.item()
@@ -123,16 +121,15 @@ class Trainer:
                     align_avg += loss_dict["align"].mean().item() / grad_accumulation
 
             if (accumulation_step + 1) % grad_accumulation == 0:
-                if self.scaler:
+                if self.args.amp:
                     if self.args.grad_clip:
                         self.scaler.unscale_(self.optimizer)
-                    self._apply_gradient_clipping()
+                        self._apply_gradient_clipping()
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
                 else:
                     self._apply_gradient_clipping()
                     self.optimizer.step()
-                    
                 self.optimizer.zero_grad()
         
         self.scheduler.step()
@@ -144,7 +141,7 @@ class Trainer:
             if self.args.learn_align:
                 display_stats = OrderedDict([
                     ("align", f"{align_avg:.2f}"),
-                    ("mse", f"{mse_avg:.2}")                                  
+                    ("mse", f"{mse_avg:.2}")                                   
                 ])
                 self.pbar.set_postfix(display_stats)
             else:
