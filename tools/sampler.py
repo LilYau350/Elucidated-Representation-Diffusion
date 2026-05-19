@@ -161,8 +161,8 @@ class Sampler:
             pbar = tqdm(total=num_samples, desc=f"Generating Samples ({self.args.solver.capitalize()})")
 
         cfg_model = self._build_cfg_model(num_classes)
-        net = Net(model=cfg_model, img_channels=self.args.in_chans, img_resolution=image_size, label_dim=num_classes, 
-                  noise_schedule=self.args.path_type, amp=self.args.amp, pred_type=self.args.mean_type).to(self.device)
+        net = Net(model=cfg_model, args=self.args, img_channels=self.args.in_chans, img_resolution=image_size, 
+                    label_dim=num_classes, amp=self.args.amp, pred_type=self.args.mean_type).to(self.device)
 
         while len(all_samples) * sample_size < num_samples:
             class_labels = self._get_y_cond(sample_size, num_classes)
