@@ -56,12 +56,7 @@ class LossType(enum.Enum):
         return self == LossType.KL or self == LossType.RESCALED_KL
 
 
-def get_named_beta_schedule(
-    schedule_name,
-    num_diffusion_timesteps,
-    lambda_max=10.0,
-    lambda_min=-10.0,
-):
+def get_named_beta_schedule(args,):
     """
     Get a pre-defined beta schedule for the given name.
 
@@ -75,33 +70,34 @@ def get_named_beta_schedule(
     where lambda(t) = log(alpha_t^2 / sigma_t^2),
     and alpha_bar(t) = alpha_t^2 = sigmoid(lambda(t)).
     """
-    if schedule_name == "linear":
+    if args.path_type == "linear":
         # Linear schedule from Ho et al, extended to work for any number of
         # diffusion steps.
-        scale = 1000 / num_diffusion_timesteps
-        beta_start = scale * 0.0001
-        beta_end = scale * 0.02
+        scale = 1000 / args.diffusion_steps
+        beta_start = scale * args.beta_range[0]
+        beta_end = scale * args.beta_range[1]
         return np.linspace(
-            beta_start, beta_end, num_diffusion_timesteps, dtype=np.float64
+            beta_start, beta_end, args.diffusion_steps, dtype=np.float64
         )
 
-    elif schedule_name == "cosine":
+    elif args.path_type == "cosine":
         return betas_for_alpha_bar(
-            num_diffusion_timesteps,
+            args.diffusion_steps,
             lambda t: math.cos((t + 0.008) / 1.008 * math.pi / 2) ** 2,
         )
 
-    elif schedule_name == "linear_logsnr":
+    elif args.path_type == "linear_logsnr":
+        lambda_min, lambda_max = args.snr_range
         def logsnr(t):
             return lambda_max + t * (lambda_min - lambda_max)
 
         def alpha_bar(t):
             return 1.0 / (1.0 + math.exp(-logsnr(t)))
 
-        return betas_for_alpha_bar(num_diffusion_timesteps, alpha_bar)
+        return betas_for_alpha_bar(args.diffusion_steps, alpha_bar)
 
     else:
-        raise NotImplementedError(f"unknown beta schedule: {schedule_name}")
+        raise NotImplementedError(f"unknown beta schedule: {args.path_type}")
 
 
 def betas_for_alpha_bar(num_diffusion_timesteps, alpha_bar, max_beta=0.999):
