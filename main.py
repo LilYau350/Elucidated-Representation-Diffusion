@@ -58,7 +58,9 @@ def parse_args():
     
     # Discrete Diffusion
     parser.add_argument("--diffusion_steps", type=int, default=1000, help="Number of diffusion steps")
-    
+    parser.add_argument("--beta_range", type=float, nargs=2, default=[0.0001, 0.02], help="Start and end values for beta (beta_start, beta_end)")
+    parser.add_argument("--snr_range", type=float, nargs=2, default=[-10.0, 10.0], help="Start and end values for snr")
+
     # loss type for diffusion or flow matching
     parser.add_argument("--mean_type", type=str, default='EPSILON', choices=['PREVIOUS_X', 'START_X', 'EPSILON', 'VELOCITY', 'VECTOR', 'SCORE'], help="Predict variable")
     parser.add_argument("--var_type", type=str, default='FIXED_LARGE', choices=['FIXED_LARGE', 'FIXED_SMALL', 'LEARNED', 'LEARNED_RANGE'], help="Variance type")
@@ -223,7 +225,7 @@ def build_model(args):
 
 def build_diffusion(args, device, use_ddim=False):
     if args.model_mode == "diffusion":
-        betas = get_named_beta_schedule(args.path_type, args.diffusion_steps)
+        betas = get_named_beta_schedule(args)
         timestep_respacing = (
             f"ddim{args.sample_steps}" if use_ddim and args.sample_steps < args.diffusion_steps else [args.diffusion_steps]
         )
