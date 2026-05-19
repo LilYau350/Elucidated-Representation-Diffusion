@@ -14,6 +14,7 @@ sys.path.append(OP_DIR)
 class Net(torch.nn.Module):
     def __init__(self,
         model,
+        args,
         img_resolution,                     # Image resolution.
         img_channels,                       # Number of color channels.
         pred_type       = 'EPSILON',            # Prediction type: 'eps', 'x0', or 'v'.
@@ -21,10 +22,6 @@ class Net(torch.nn.Module):
         amp             = False,            # Execute the underlying model at FP16 precision?
         C_1             = 0.001,            # Timestep adjustment at low noise levels.
         C_2             = 0.008,            # Timestep adjustment at high noise levels.
-        M               = 1000,             # Original number of timesteps in the DDPM formulation.
-        noise_schedule  = 'linear',
-        lambda_max=10.0,
-        lambda_min=-10.0,
     ):
         super().__init__()
         self.img_resolution = img_resolution
@@ -33,12 +30,13 @@ class Net(torch.nn.Module):
         self.amp = amp
         self.C_1 = C_1
         self.C_2 = C_2
-        self.M = M
         self.model = model
-        self.noise_schedule = noise_schedule
         self.pred_type = pred_type  # 'eps', 'x0', or 'v'
-        self.lambda_max = lambda_max
-        self.lambda_min = lambda_min
+
+        self.M = args.diffusion_steps
+        self.noise_schedule = args.path_type
+        self.beta_start, self.beta_end = args.beta_range
+        self.lambda_min, self.lambda_max = args.snr_range
         
         u = torch.zeros(M + 1)
         for j in range(M, 0, -1):  # M, ..., 1
@@ -86,7 +84,7 @@ class Net(torch.nn.Module):
             return (0.5 * np.pi * j / self.M / (self.C_2 + 1)).sin() ** 2
         
         elif self.noise_schedule == 'linear':
-            betas = np.linspace(0.0001, 0.02, self.M + 1, dtype=np.float64)
+            betas = np.linspace(self.beta_start, self.beta_end, self.M + 1, dtype=np.float64)
             alphas = 1.0 - betas
             alphas_cumprod = np.cumprod(alphas, axis=0)
             return alphas_cumprod[self.M - j]
