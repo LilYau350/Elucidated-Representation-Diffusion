@@ -38,7 +38,7 @@ class Net(torch.nn.Module):
         self.beta_start, self.beta_end = args.beta_range
         self.lambda_min, self.lambda_max = args.snr_range
         
-        u = torch.zeros(M + 1)
+        u = torch.zeros(self.M + 1)
         for j in range(M, 0, -1):  # M, ..., 1
             u[j - 1] = ((u[j] ** 2 + 1) / (self.alpha_bar(j - 1) / self.alpha_bar(j)).clip(min=C_1) - 1).sqrt()
         self.register_buffer('u', u)
