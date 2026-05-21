@@ -42,7 +42,7 @@ class Net(torch.nn.Module):
         for j in range(self.M, 0, -1):  # M, ..., 1
             u[j - 1] = ((u[j] ** 2 + 1) / (self.alpha_bar(j - 1) / self.alpha_bar(j)).clip(min=C_1) - 1).sqrt()
         self.register_buffer('u', u)
-        self.sigma_min = float(u[M - 1])
+        self.sigma_min = float(u[self.M - 1])
         self.sigma_max = float(u[0])
 
     def forward(self, x, sigma, class_labels=None, force_fp32=False, **model_kwargs):
