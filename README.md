@@ -63,3 +63,16 @@ To train our diffusion models, we provide a command script located at [run.sh](.
 
 ## 💡 Acknowledgements
 This repository is based on [openai/guided-diffusion](https://github.com/openai/guided-diffusion). We use implementations for sampling and FID evaluation from [NVlabs/edm](https://github.com/NVlabs/edm).
+
+## 📚 Citation
+
+If you find this repository useful, please consider giving it a star ⭐ and citing our work 📄.
+
+```bibtex
+@article{yao2026elucidating,
+  title={Elucidating Representation Degradation Problem in Diffusion Model Training},
+  author={Yao, Zhipeng and Li, Dazhou and Zhang, Zitong and Mahee, Durude and Zhu, Fan and Zhang, Wenbin and He, Xinwei and Jin, Yeying and Yu, Rui},
+  journal={arXiv preprint arXiv:2605.10790},
+  year={2026}
+}
+```
