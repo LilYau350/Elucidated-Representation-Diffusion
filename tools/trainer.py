@@ -37,9 +37,7 @@ class Trainer:
         self.train_loader = train_loader
         self.datalooper = iter(train_loader)
         self.encoder = initialize_encoders(args, device) if args.learn_align else None
-        self.precision = args.precision
-        self.amp_dtype = torch.float16 if args.precision == "fp16" else torch.bfloat16
-        self.scaler = GradScaler(enabled=args.amp and args.precision == "fp16")
+        self.scaler = GradScaler(enabled=args.amp and args.precision == torch.float16)
         self.pbar = pbar
     
     def _get_next_batch(self):
@@ -104,7 +102,7 @@ class Trainer:
 
             with sync_context:
                 if self.args.amp:
-                    with autocast(dtype=self.amp_dtype):
+                    with autocast(dtype=self.args.precision):
                         loss_dict = self._compute_loss(images, labels, features)
                         loss = loss_dict["loss"].mean() / grad_accumulation
                     
