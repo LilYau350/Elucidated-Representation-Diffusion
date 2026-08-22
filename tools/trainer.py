@@ -130,7 +130,7 @@ class Trainer:
                 else:
                     self._apply_gradient_clipping()
                     self.optimizer.step()
-                self.optimizer.zero_grad(set_to_none=true)
+                self.optimizer.zero_grad(set_to_none=True)
         
         self.scheduler.step()
         
