@@ -104,6 +104,7 @@ def parse_args():
     # DDP nad mixed precision training
     parser.add_argument("--parallel", default=False, type=str2bool, help="Use multi-GPU training")
     parser.add_argument('--amp', default=True, type=str2bool, help='Use AMP for mixed precision training')
+    parser.add_argument('--precision', type=str, default='fp16', choices=['fp16', 'bf16'], help='Mixed precision type: fp16 or bf16')
     parser.add_argument('--grad_accumulation', type=int, default=1, help='Number of gradient accumulation steps (default: 1, no accumulation)')
     parser.add_argument('--resume', type=str, default=None, help='Path to the checkpoint to resume from')   
 
@@ -134,6 +135,12 @@ def parse_args():
     parser.add_argument("--ref_batch", type=str, default='./reference_batches/fid_stats_cifar_train.npz', help="FID cache")
 
     args = parser.parse_args()    
+
+    if args.precision == "fp16":
+        args.precision = torch.float16
+    else:
+        args.precision = torch.bfloat16
+        
     return args
 
 
