@@ -36,8 +36,10 @@ class Trainer:
         self.diffusion = diffusion
         self.train_loader = train_loader
         self.datalooper = iter(train_loader)
-        self.encoder = initialize_encoders(args, device) if args.learn_align else None            
-        self.scaler = GradScaler() if args.amp else None     
+        self.encoder = initialize_encoders(args, device) if args.learn_align else None
+        self.precision = args.precision
+        self.amp_dtype = torch.float16 if args.precision == "fp16" else torch.bfloat16
+        self.scaler = GradScaler(enabled=args.amp and args.precision == "fp16")
         self.pbar = pbar
     
     def _get_next_batch(self):
@@ -102,10 +104,14 @@ class Trainer:
 
             with sync_context:
                 if self.args.amp:
-                    with autocast():
+                    with autocast(dtype=self.amp_dtype):
                         loss_dict = self._compute_loss(images, labels, features)
                         loss = loss_dict["loss"].mean() / grad_accumulation
-                    self.scaler.scale(loss).backward()
+                    
+                    if self.scaler.is_enabled():
+                        self.scaler.scale(loss).backward()
+                    else:
+                        loss.backward()
                 else:
                     loss_dict = self._compute_loss(images, labels, features)
                     loss = loss_dict["loss"].mean() / grad_accumulation
@@ -121,7 +127,7 @@ class Trainer:
                     align_avg += loss_dict["align"].mean().item() / grad_accumulation
 
             if (accumulation_step + 1) % grad_accumulation == 0:
-                if self.args.amp:
+                if self.scaler.is_enabled():
                     if self.args.grad_clip:
                         self.scaler.unscale_(self.optimizer)
                         self._apply_gradient_clipping()
@@ -130,6 +136,7 @@ class Trainer:
                 else:
                     self._apply_gradient_clipping()
                     self.optimizer.step()
+
                 self.optimizer.zero_grad(set_to_none=True)
         
         self.scheduler.step()
