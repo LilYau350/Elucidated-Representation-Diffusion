@@ -37,7 +37,7 @@ class Trainer:
         self.train_loader = train_loader
         self.datalooper = iter(train_loader)
         self.encoder = initialize_encoders(args, device) if args.learn_align else None            
-        self.scaler = GradScaler() if args.amp else None     
+        self.scaler = GradScaler(enabled=args.amp)     
         self.pbar = pbar
     
     def _get_next_batch(self):
@@ -130,7 +130,7 @@ class Trainer:
                 else:
                     self._apply_gradient_clipping()
                     self.optimizer.step()
-                self.optimizer.zero_grad()
+                self.optimizer.zero_grad(set_to_none=True)
         
         self.scheduler.step()
         
