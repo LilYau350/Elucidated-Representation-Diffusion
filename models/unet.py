@@ -686,6 +686,27 @@ class UNetModel(nn.Module):
         h = h.type(x.dtype)
         return self.out(h)
 
+    def forward_features(self, x, timesteps, y=None, force_drop_ids=None, **kwargs):
+        assert (y is not None) == (self.num_classes > 0), "must specify y if and only if the model is class-conditional"
+        hs = []
+        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
+        if self.num_classes > 0:
+            use_dropout = (self.drop_label_prob > 0) and self.training
+            if use_dropout or (force_drop_ids is not None):
+                y = self.token_drop(y, force_drop_ids)
+            assert y.shape == (x.shape[0],)
+            emb = emb + self.label_emb(y)
+            
+        h = x.type(self.dtype)
+        for module in self.input_blocks:
+            h = module(h, emb)
+            hs.append(h)
+        h = self.middle_block(h, emb)
+        for module in self.output_blocks:
+            h = torch.cat([h, hs.pop()], dim=1)
+            h = module(h, emb)
+        h = h.type(x.dtype)
+        return self.out(h), h
 
 class SuperResModel(UNetModel):
     """
@@ -981,7 +1002,7 @@ def create_unet_model(
     )
 
 def UNet_32(num_classes=10, in_channels=3, dropout=0, learn_sigma=False, class_cond=True, drop_label_prob=0.0, **kwargs):
-    return create_unet_model(image_size=32, num_channels=128, num_res_blocks=2, attention_resolutions="16,8", num_heads=4, 
+    return create_unet_model(image_size=32, num_channels=128, num_res_blocks=2, attention_resolutions="16", num_heads=1, 
                              num_head_channels=-1, num_classes=num_classes, dropout=dropout, in_channels=in_channels, 
                              drop_label_prob=drop_label_prob, learn_sigma=learn_sigma, class_cond=class_cond, **kwargs)
     
