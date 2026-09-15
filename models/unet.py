@@ -1043,12 +1043,12 @@ def LDM(num_classes=10, in_channels=4, dropout=0, learn_sigma=False, class_cond=
     
 UNet_models = {
     "UNet-32": UNet_32,
+    "UNet-64": UNet_64,
     "ADM-32": ADM_32,
-    "ADM-64": UNet_64,
+    "ADM-64": ADM_64,
     "ADM-128": ADM_128,
     "ADM-256": ADM_256,
     "ADM-512": ADM_512,
-    "UNet-64": UNet_64,
     "LDM": LDM,
 }
 
